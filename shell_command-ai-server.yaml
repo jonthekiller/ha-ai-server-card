@@ -1,0 +1,28 @@
+# AI Server Shell Commands - Home Assistant
+#
+# Include dans configuration.yaml:
+#   shell_command: !include shell_command-ai-server.yaml
+
+vllm_start: >
+  ssh -i /config/ssh_ai_server
+  -o StrictHostKeyChecking=no
+  USER@AI-SERVER-HOST
+  "cd ~/docker/models/YOUR-MODEL && sudo ./start.sh"
+
+vllm_stop: >
+  ssh -i /config/ssh_ai_server
+  -o StrictHostKeyChecking=no
+  USER@AI-SERVER-HOST
+  "cd ~/docker/models/YOUR-MODEL && sudo ./stop.sh"
+
+vllm_restart: >
+  ssh -i /config/ssh_ai_server
+  -o StrictHostKeyChecking=no
+  USER@AI-SERVER-HOST
+  "cd ~/docker/models/YOUR-MODEL && sudo ./restart.sh"
+
+vllm_logs: >
+  ssh -i /config/ssh_ai_server
+  -o StrictHostKeyChecking=no
+  USER@AI-SERVER-HOST
+  "cd ~/docker/models/YOUR-MODEL && sudo ./logs.sh"

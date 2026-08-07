@@ -1,0 +1,102 @@
+# AI Server Sensors - Home Assistant command_line
+# Include dans configuration.yaml:
+#   sensor: !include sensors-ai-server.yaml
+
+sensor:
+
+  # ── GPU Usage ─────────────────────────────────────────
+  - platform: command_line
+    name: "AI GPU Usage"
+    command: >
+      ssh -i /config/ssh_ai_server
+      -o StrictHostKeyChecking=no
+      USER@AI-SERVER-HOST
+      "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader"
+    scan_interval: 15
+    unit_of_measurement: "%"
+    value_template: "{{ value.strip() | replace('%', '') | float }}"
+
+  # ── VRAM Usage ────────────────────────────────────────
+  - platform: command_line
+    name: "AI VRAM Usage"
+    command: >
+      ssh -i /config/ssh_ai_server
+      -o StrictHostKeyChecking=no
+      USER@AI-SERVER-HOST
+      "nvidia-smi --query-gpu=memory.used --format=csv,noheader"
+    scan_interval: 15
+    unit_of_measurement: "MiB"
+    value_template: "{{ value.strip() | replace(' MiB', '') | float }}"
+
+  # ── VRAM Total ────────────────────────────────────────
+  - platform: command_line
+    name: "AI VRAM Total"
+    command: >
+      ssh -i /config/ssh_ai_server
+      -o StrictHostKeyChecking=no
+      USER@AI-SERVER-HOST
+      "nvidia-smi --query-gpu=memory.total --format=csv,noheader"
+    scan_interval: 300
+    unit_of_measurement: "MiB"
+    value_template: "{{ value.strip() | replace(' MiB', '') | float }}"
+
+  # ── GPU Temperature ──────────────────────────────────
+  - platform: command_line
+    name: "AI GPU Temperature"
+    command: >
+      ssh -i /config/ssh_ai_server
+      -o StrictHostKeyChecking=no
+      USER@AI-SERVER-HOST
+      "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
+    scan_interval: 30
+    unit_of_measurement: "°C"
+    value_template: "{{ value.strip() | float }}"
+
+  # ── LLM Metrics (via llm_metrics.sh) ──────────────────
+  # Outputs JSON: running, waiting, ttft, itl, tokens, ctx, model, uptime
+  # model = serving model ID from /v1/models (vLLM) or /v1/models (ds4-server)
+  # uptime = seconds since process start
+  - platform: command_line
+    name: "vLLM Metrics"
+    command: "bash /config/scripts/llm_metrics.sh 10002 'your-model-name'"
+    json_attributes:
+      - running
+      - waiting
+      - ttft
+      - itl
+      - tokens
+      - ctx
+      - model
+      - uptime
+    scan_interval: 15
+    value_template: "{{ value_json.running | default(0) }}"
+
+  - platform: command_line
+    name: "vLLM Metrics 2"
+    command: "bash /config/scripts/llm_metrics.sh 10001 'your-model-name-2'"
+    json_attributes:
+      - running
+      - waiting
+      - ttft
+      - itl
+      - tokens
+      - ctx
+      - model
+      - uptime
+    scan_interval: 15
+    value_template: "{{ value_json.running | default(0) }}"
+
+  - platform: command_line
+    name: "vLLM Metrics 3"
+    command: "bash /config/scripts/llm_metrics.sh 10003 'your-model-name-3'"
+    json_attributes:
+      - running
+      - waiting
+      - ttft
+      - itl
+      - tokens
+      - ctx
+      - model
+      - uptime
+    scan_interval: 15
+    value_template: "{{ value_json.running | default(0) }}"
