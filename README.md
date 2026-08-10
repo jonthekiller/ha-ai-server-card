@@ -2,7 +2,7 @@
 
 A custom Home Assistant Lovelace card for managing AI inference servers. Monitor status, GPU/RAM/temperature metrics, and control services directly from your dashboard.
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Screenshots
