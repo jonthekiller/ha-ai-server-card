@@ -1387,7 +1387,7 @@ const cardStyles = i$4`
 const CARD_NAME = "llm-server-card";
 const EDITOR_NAME = "llm-server-card-editor";
 const DEFAULT_REFRESH_INTERVAL = 30;
-const CARD_VERSION = "2026-08-07-15:15:06";
+const CARD_VERSION = "2026-08-10-20:35:28";
 function getMetricColorClass(value) {
   if (value >= 90) return "critical";
   if (value >= 75) return "warning";
@@ -1443,7 +1443,8 @@ const translations = {
       start: "Start",
       stop: "Stop",
       restart: "Restart",
-      logs: "Logs"
+      logs: "Logs",
+      custom: "Custom"
     },
     perf: {
       running: "Running",
@@ -1483,7 +1484,8 @@ const translations = {
       start: "Démarrer",
       stop: "Arrêter",
       restart: "Redémarrer",
-      logs: "Logs"
+      logs: "Logs",
+      custom: "Personnalisé"
     },
     perf: {
       running: "En cours",
@@ -1663,9 +1665,78 @@ let LlmServerCardEditor = class extends HTMLElement {
       ["temperature_entity", "Temperature entity"]
     ].forEach(([key, lbl]) => {
       container.appendChild(
-        this._entityField(lbl, String(metrics[key] ?? ""), (v2) => this._setServerMetric(key, v2), ["sensor"])
+        this._entityField(
+          lbl,
+          String(metrics[key] ?? ""),
+          (v2) => this._setServerMetric(key, v2),
+          ["sensor"]
+        )
       );
     });
+    container.appendChild(this._section("Host Custom Actions", true));
+    const hostActions = server.customActions ?? [];
+    const shellCmds = Object.keys(this.hass?.services?.shell_command ?? {});
+    const dl = document.createElement("datalist");
+    dl.id = "ha-ai-shell-cmds";
+    for (const cmd of shellCmds) {
+      const opt = document.createElement("option");
+      opt.value = `shell_command.${cmd}`;
+      dl.appendChild(opt);
+    }
+    container.appendChild(dl);
+    hostActions.forEach((act, ai) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px;";
+      const iname = document.createElement("input");
+      iname.value = act.name ?? "";
+      iname.placeholder = "Name";
+      iname.className = "input-fallback";
+      iname.style.flex = "1";
+      const ico = document.createElement("input");
+      ico.value = act.icon || "";
+      ico.placeholder = "mdi:console";
+      ico.className = "input-fallback";
+      ico.style.flex = "1";
+      ico.setAttribute("list", "ha-ai-icons");
+      const isvc = document.createElement("input");
+      isvc.value = act.service ?? "";
+      isvc.placeholder = "shell_command.x";
+      isvc.className = "input-fallback";
+      isvc.style.flex = "2";
+      isvc.setAttribute("list", "ha-ai-shell-cmds");
+      const bdel = document.createElement("button");
+      bdel.textContent = "×";
+      bdel.className = "btn-remove";
+      bdel.style.cssText = "padding: 4px 10px; font-size: 1rem; flex-shrink: 0;";
+      bdel.addEventListener("click", () => {
+        const filtered = hostActions.filter((_2, i3) => i3 !== ai);
+        this._setServer("customActions", filtered.length ? filtered : void 0);
+        this._render();
+      });
+      const sync = () => {
+        const updated = [...hostActions];
+        updated[ai] = { name: iname.value, service: isvc.value, icon: ico.value || void 0 };
+        this._setServer("customActions", updated);
+      };
+      iname.addEventListener("change", sync);
+      ico.addEventListener("change", sync);
+      isvc.addEventListener("change", sync);
+      row.appendChild(iname);
+      row.appendChild(ico);
+      row.appendChild(isvc);
+      row.appendChild(bdel);
+      container.appendChild(row);
+    });
+    const addActionBtn = document.createElement("button");
+    addActionBtn.className = "btn-add";
+    addActionBtn.style.marginTop = "4px";
+    addActionBtn.textContent = "+ Add Host Action";
+    addActionBtn.addEventListener("click", () => {
+      const next = [...hostActions, { name: "New Action", service: "" }];
+      this._setServer("customActions", next);
+      this._render();
+    });
+    container.appendChild(addActionBtn);
     container.appendChild(this._section("Services"));
     const services = c2.services || [];
     services.forEach((svc, idx) => {
@@ -1883,7 +1954,12 @@ let LlmServerCardEditor = class extends HTMLElement {
   _tabBasic(service, idx) {
     const container = document.createElement("div");
     container.appendChild(
-      this._entityField("Status entity (required)", service.status_entity ?? "", (v2) => this._setService(idx, "status_entity", v2), ["sensor", "binary_sensor"])
+      this._entityField(
+        "Status entity (required)",
+        service.status_entity ?? "",
+        (v2) => this._setService(idx, "status_entity", v2),
+        ["sensor", "binary_sensor"]
+      )
     );
     const styleLabel = document.createElement("div");
     styleLabel.className = "label";
@@ -1923,7 +1999,12 @@ let LlmServerCardEditor = class extends HTMLElement {
     const perfGrid = document.createElement("div");
     perfGrid.className = "entity-grid";
     perfGrid.appendChild(
-      this._entityField("vLLM metrics entity", service.metrics_entity ?? "", (v2) => this._setService(idx, "metrics_entity", v2), ["sensor"])
+      this._entityField(
+        "vLLM metrics entity",
+        service.metrics_entity ?? "",
+        (v2) => this._setService(idx, "metrics_entity", v2),
+        ["sensor"]
+      )
     );
     container.appendChild(perfGrid);
     const infoLabel = document.createElement("div");
@@ -1939,7 +2020,9 @@ let LlmServerCardEditor = class extends HTMLElement {
       ["uptime_entity", "Uptime entity"]
     ].forEach(([key, lbl]) => {
       infoGrid.appendChild(
-        this._entityField(lbl, service[key] ?? "", (v2) => this._setService(idx, key, v2), ["sensor"])
+        this._entityField(lbl, service[key] ?? "", (v2) => this._setService(idx, key, v2), [
+          "sensor"
+        ])
       );
     });
     return container;
@@ -1961,7 +2044,12 @@ let LlmServerCardEditor = class extends HTMLElement {
       ["logs_service", "Logs"]
     ].forEach(([key, label]) => {
       grid.appendChild(
-        this._serviceField(label, service[key] ?? "", key, (v2) => this._setService(idx, key, v2))
+        this._serviceField(
+          label,
+          service[key] ?? "",
+          key,
+          (v2) => this._setService(idx, key, v2)
+        )
       );
     });
     container.appendChild(grid);
@@ -2301,6 +2389,43 @@ let LlmServerCard = class extends i$1 {
     };
     this._setupRefresh();
   }
+  _renderServerActions(server) {
+    if (!server.customActions?.length) return b``;
+    return b`
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px 8px; border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.12));">
+        <span style="font-size:0.7rem; color: var(--secondary-text-color, #757575); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;">
+          ${this._messages.action.custom}
+        </span>
+        ${server.customActions.map(
+      (action) => b`<ha-icon-button
+            .label="${action.name}"
+            title="${action.name}"
+            @click=${() => this._handleServerAction(action)}
+            @click.stop
+          >
+            <ha-icon icon="${action.icon ?? "mdi:console-line"}"></ha-icon>
+          </ha-icon-button>`
+    )}
+      </div>
+    `;
+  }
+  async _handleServerAction(action) {
+    if (!this.hass) return;
+    const { domain, service: serviceName } = parseService(action.service);
+    try {
+      await this.hass.callService(domain, serviceName);
+      this._showToast(
+        formatMessage(this._messages, "toast", "action_executed", { name: action.name, service: this._config.server.name }),
+        "success"
+      );
+    } catch (err) {
+      console.error(`Failed to call ${action.service}:`, err);
+      this._showToast(
+        formatMessage(this._messages, "toast", "failed", { name: action.name }),
+        "error"
+      );
+    }
+  }
   getCardSize() {
     if (!this._config) return 1;
     return Math.max(3, this._config.services.length + 1);
@@ -2314,6 +2439,7 @@ let LlmServerCard = class extends i$1 {
       <ha-card>
         ${this._renderHeader(server, options)}
         ${server.metrics && options.show_server_metrics !== false ? this._renderServerMetrics(server.metrics, options) : ""}
+        ${this._renderServerActions(server)}
         ${this._renderServices(services, options)} ${this._toast ? this._renderToast() : ""}
       </ha-card>
     `;
@@ -2700,13 +2826,11 @@ let LlmServerCard = class extends i$1 {
     if (action === "Start") pendingStatus = "starting";
     else if (action === "Stop") pendingStatus = "stopped";
     else if (action === "Restart") pendingStatus = "restarting";
-    else return;
-    this._setPendingStatus(serviceConfig.name, pendingStatus);
+    if (pendingStatus) this._setPendingStatus(serviceConfig.name, pendingStatus);
     try {
       await this.hass.callService(domain, serviceName);
-      const key = action === "Start" ? "start" : action === "Stop" ? "stop" : "restart";
       this._showToast(
-        formatMessage(this._messages, "toast", key, { name: serviceConfig.name }),
+        formatMessage(this._messages, "toast", "action_executed", { name: action, service: serviceConfig.name }),
         "success"
       );
     } catch (err) {

@@ -3,6 +3,18 @@
  */
 
 /**
+ * Custom action definition
+ */
+export interface CustomAction {
+  /** Display label */
+  name: string;
+  /** Service to call (e.g. "notify.messenger") */
+  service: string;
+  /** Optional icon override (e.g. "mdi:message") */
+  icon?: string;
+}
+
+/**
  * Service configuration
  */
 export interface ServiceConfig {
@@ -13,11 +25,11 @@ export interface ServiceConfig {
   uptime_entity?: string;
   // vLLM performance metrics (single JSON sensor)
   metrics_entity?: string;
-  // Actions
-  start_service?: string; // e.g., "shell_command.vllm_start"
-  stop_service?: string; // e.g., "shell_command.vllm_stop"
-  restart_service?: string; // e.g., "shell_command.vllm_restart"
-  logs_service?: string; // e.g., "shell_command.vllm_logs"
+  // Actions (per-service)
+  start_service?: string;
+  stop_service?: string;
+  restart_service?: string;
+  logs_service?: string;
   // Style
   icon?: string;
   color?: string;
@@ -39,6 +51,7 @@ export interface ServerConfig {
   name: string;
   ip?: string;
   metrics?: ServerMetrics;
+  customActions?: CustomAction[];
 }
 
 /**

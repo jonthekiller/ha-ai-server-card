@@ -178,7 +178,6 @@ export class LlmServerCardEditor extends HTMLElement {
     this._fireConfigChanged();
   }
 
-
   /* ── Rendering ───────────────────────────────── */
 
   private _render(): void {
@@ -214,9 +213,89 @@ export class LlmServerCardEditor extends HTMLElement {
       ['temperature_entity', 'Temperature entity'],
     ].forEach(([key, lbl]) => {
       container.appendChild(
-        this._entityField(lbl, String((metrics as any)[key] ?? ''), v => this._setServerMetric(key, v), ['sensor']),
+        this._entityField(
+          lbl,
+          String((metrics as any)[key] ?? ''),
+          (v) => this._setServerMetric(key, v),
+          ['sensor'],
+        ),
       );
     });
+
+    // Server Custom Actions (host-level)
+    container.appendChild(this._section('Host Custom Actions', true));
+    const hostActions: Array<{ name: string; service: string; icon?: string }> = (server as any).customActions ?? [];
+
+    // Datalist for shell_command autocomplete
+    const shellCmds = Object.keys((this.hass?.services?.shell_command as any) ?? {});
+    const dl = document.createElement('datalist');
+    dl.id = 'ha-ai-shell-cmds';
+    for (const cmd of shellCmds) {
+      const opt = document.createElement('option');
+      opt.value = `shell_command.${cmd}`;
+      dl.appendChild(opt);
+    }
+    container.appendChild(dl);
+
+    hostActions.forEach((act, ai) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px;';
+
+      const iname = document.createElement('input');
+      iname.value = act.name ?? '';
+      iname.placeholder = 'Name';
+      iname.className = 'input-fallback';
+      iname.style.flex = '1';
+
+      const ico = document.createElement('input');
+      ico.value = act.icon || '';
+      ico.placeholder = 'mdi:console';
+      ico.className = 'input-fallback';
+      ico.style.flex = '1';
+      ico.setAttribute('list', 'ha-ai-icons');
+
+      const isvc = document.createElement('input');
+      isvc.value = act.service ?? '';
+      isvc.placeholder = 'shell_command.x';
+      isvc.className = 'input-fallback';
+      isvc.style.flex = '2';
+      isvc.setAttribute('list', 'ha-ai-shell-cmds');
+
+      const bdel = document.createElement('button');
+      bdel.textContent = '×';
+      bdel.className = 'btn-remove';
+      bdel.style.cssText = 'padding: 4px 10px; font-size: 1rem; flex-shrink: 0;';
+      bdel.addEventListener('click', () => {
+        const filtered = hostActions.filter((_, i) => i !== ai);
+        this._setServer('customActions', filtered.length ? filtered : undefined);
+        this._render();
+      });
+
+      const sync = () => {
+        const updated = [...hostActions];
+        updated[ai] = { name: iname.value, service: isvc.value, icon: ico.value || undefined };
+        this._setServer('customActions', updated);
+      };
+      iname.addEventListener('change', sync);
+      ico.addEventListener('change', sync);
+      isvc.addEventListener('change', sync);
+      row.appendChild(iname);
+      row.appendChild(ico);
+      row.appendChild(isvc);
+      row.appendChild(bdel);
+      container.appendChild(row);
+    });
+
+    const addActionBtn = document.createElement('button');
+    addActionBtn.className = 'btn-add';
+    addActionBtn.style.marginTop = '4px';
+    addActionBtn.textContent = '+ Add Host Action';
+    addActionBtn.addEventListener('click', () => {
+      const next = [...hostActions, { name: 'New Action', service: '' }];
+      this._setServer('customActions', next);
+      this._render();
+    });
+    container.appendChild(addActionBtn);
 
     // Services
     container.appendChild(this._section('Services'));
@@ -472,7 +551,12 @@ export class LlmServerCardEditor extends HTMLElement {
   private _tabBasic(service: ServiceConfig, idx: number): HTMLDivElement {
     const container = document.createElement('div');
     container.appendChild(
-      this._entityField('Status entity (required)', (service as any).status_entity ?? '', (v) => this._setService(idx, 'status_entity', v), ['sensor', 'binary_sensor']),
+      this._entityField(
+        'Status entity (required)',
+        (service as any).status_entity ?? '',
+        (v) => this._setService(idx, 'status_entity', v),
+        ['sensor', 'binary_sensor'],
+      ),
     );
 
     const styleLabel = document.createElement('div');
@@ -520,7 +604,12 @@ export class LlmServerCardEditor extends HTMLElement {
     const perfGrid = document.createElement('div');
     perfGrid.className = 'entity-grid';
     perfGrid.appendChild(
-      this._entityField('vLLM metrics entity', (service as any).metrics_entity ?? '', v => this._setService(idx, 'metrics_entity', v), ['sensor']),
+      this._entityField(
+        'vLLM metrics entity',
+        (service as any).metrics_entity ?? '',
+        (v) => this._setService(idx, 'metrics_entity', v),
+        ['sensor'],
+      ),
     );
     container.appendChild(perfGrid);
 
@@ -538,7 +627,9 @@ export class LlmServerCardEditor extends HTMLElement {
       ['uptime_entity', 'Uptime entity'],
     ].forEach(([key, lbl]) => {
       infoGrid.appendChild(
-        this._entityField(lbl, (service as any)[key] ?? '', v => this._setService(idx, key, v), ['sensor']),
+        this._entityField(lbl, (service as any)[key] ?? '', (v) => this._setService(idx, key, v), [
+          'sensor',
+        ]),
       );
     });
 
@@ -564,7 +655,9 @@ export class LlmServerCardEditor extends HTMLElement {
       ['logs_service', 'Logs'],
     ].forEach(([key, label]) => {
       grid.appendChild(
-        this._serviceField(label, (service as any)[key] ?? '', key, (v) => this._setService(idx, key, v)),
+        this._serviceField(label, (service as any)[key] ?? '', key, (v) =>
+          this._setService(idx, key, v),
+        ),
       );
     });
     container.appendChild(grid);
@@ -652,7 +745,7 @@ export class LlmServerCardEditor extends HTMLElement {
     if (filterEntityTypes) picker.filterEntityTypes = filterEntityTypes;
     picker.addEventListener('value-changed', () => {
       // ha-entity-picker returns ['entity_id'] array
-      onChange(Array.isArray(picker.value) ? (picker.value[0] || '') : (picker.value || ''));
+      onChange(Array.isArray(picker.value) ? picker.value[0] || '' : picker.value || '');
     });
     field.appendChild(picker);
     return field;

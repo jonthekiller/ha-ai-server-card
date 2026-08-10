@@ -37,6 +37,7 @@ export const translations: Record<string, TranslationMessages> = {
       stop: 'Stop',
       restart: 'Restart',
       logs: 'Logs',
+      custom: 'Custom',
     },
     perf: {
       running: 'Running',
@@ -77,6 +78,7 @@ export const translations: Record<string, TranslationMessages> = {
       stop: 'Arrêter',
       restart: 'Redémarrer',
       logs: 'Logs',
+      custom: 'Personnalisé',
     },
     perf: {
       running: 'En cours',

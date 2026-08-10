@@ -2,7 +2,7 @@
 
 A custom Home Assistant Lovelace card for managing AI inference servers. Monitor status, GPU/RAM/temperature metrics, and control services directly from your dashboard.
 
-![Version](https://img.shields.io/github/v/release/jonthekiller/ha-ai-server-card.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Screenshots
@@ -20,6 +20,7 @@ A custom Home Assistant Lovelace card for managing AI inference servers. Monitor
 - **Expand/Collapse** — Collapsible per-service metrics with animated chevron (compact mode collapses by default)
 - **Last Updated** — Relative "last update" timestamp in the header
 - **Entity Warning** — Orange indicator when an entity is unavailable
+- **Host Custom Actions** — Add arbitrary buttons (with icons) that call any HA service, rendered at the server level
 - **Service Controls** — Start, stop, restart, logs with one click; buttons disabled during transitions
 - **Manual Refresh** — Force-refresh button to sync card with current HA state
 - **i18n** — French/English translations auto-detected from HA language (`hass.language`)
@@ -141,6 +142,26 @@ options:
 | `server.metrics.gpu_entity` | string | — | GPU usage entity (%) |
 | `server.metrics.memory_entity` | string | — | RAM/VRAM usage entity (%) |
 | `server.metrics.temperature_entity` | string | — | Temperature entity (°C) |
+| `server.customActions` | array | — | Host-level custom actions (see below) |
+
+### Host Custom Actions
+
+Add buttons that call any HA service (e.g. `shell_command.*`) rendered at the server level:
+
+```yaml
+type: custom:llm-server-card
+server:
+  name: DGX Spark
+  customActions:
+    - name: "Restart NGINX"
+      service: shell_command.nginx_restart
+      icon: "mdi:nginx"
+    - name: "Clean cache"
+      service: shell_command.clean_cache
+      icon: "mdi:delete-scan"
+```
+
+In the visual editor, use the "Host Custom Actions" section. The icon field auto-completes ~70 MDI icons.
 
 ### Services
 

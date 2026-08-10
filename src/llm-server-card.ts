@@ -126,6 +126,45 @@ export class LlmServerCard extends LitElement {
     this._setupRefresh();
   }
 
+  private _renderServerActions(server: ServerConfig) {
+    if (!server.customActions?.length) return html``;
+    return html`
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px 8px; border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.12));">
+        <span style="font-size:0.7rem; color: var(--secondary-text-color, #757575); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0;">
+          ${this._messages.action.custom}
+        </span>
+        ${server.customActions.map((action) =>
+          html`<ha-icon-button
+            .label="${action.name}"
+            title="${action.name}"
+            @click=${() => this._handleServerAction(action)}
+            @click.stop
+          >
+            <ha-icon icon="${action.icon ?? 'mdi:console-line'}"></ha-icon>
+          </ha-icon-button>`,
+        )}
+      </div>
+    `;
+  }
+
+  private async _handleServerAction(action: { name: string; service: string }): Promise<void> {
+    if (!this.hass) return;
+    const { domain, service: serviceName } = parseService(action.service);
+    try {
+      await this.hass.callService(domain, serviceName);
+      this._showToast(
+        formatMessage(this._messages, 'toast', 'action_executed', { name: action.name, service: this._config!.server.name }),
+        'success',
+      );
+    } catch (err) {
+      console.error(`Failed to call ${action.service}:`, err);
+      this._showToast(
+        formatMessage(this._messages, 'toast', 'failed', { name: action.name }),
+        'error',
+      );
+    }
+  }
+
   public getCardSize(): number {
     if (!this._config) return 1;
     return Math.max(3, this._config.services.length + 1);
@@ -142,6 +181,7 @@ export class LlmServerCard extends LitElement {
       <ha-card>
         ${this._renderHeader(server, options!)}
         ${server.metrics && options!.show_server_metrics !== false ? this._renderServerMetrics(server.metrics, options!) : ''}
+        ${this._renderServerActions(server)}
         ${this._renderServices(services, options!)} ${this._toast ? this._renderToast() : ''}
       </ha-card>
     `;
@@ -518,7 +558,6 @@ export class LlmServerCard extends LitElement {
         ),
       );
     }
-
     if (actions.length === 0) return html``;
 
     return html`<div class="service-actions">${actions}</div>`;
@@ -612,20 +651,18 @@ export class LlmServerCard extends LitElement {
     if (!this.hass || !isValidService(service)) return;
     const { domain, service: serviceName } = parseService(service);
 
-    // Set optimistic status
-    let pendingStatus: ServiceStatus;
+    // Set optimistic status for known actions
+    let pendingStatus: ServiceStatus | undefined;
     if (action === 'Start') pendingStatus = 'starting';
     else if (action === 'Stop') pendingStatus = 'stopped';
     else if (action === 'Restart') pendingStatus = 'restarting';
-    else return; // Logs action, no status change
 
-    this._setPendingStatus(serviceConfig.name, pendingStatus);
+    if (pendingStatus) this._setPendingStatus(serviceConfig.name, pendingStatus);
 
     try {
       await this.hass.callService(domain, serviceName);
-      const key = action === 'Start' ? 'start' : action === 'Stop' ? 'stop' : 'restart';
       this._showToast(
-        formatMessage(this._messages, 'toast', key, { name: serviceConfig.name }),
+        formatMessage(this._messages, 'toast', 'action_executed', { name: action, service: serviceConfig.name }),
         'success',
       );
     } catch (err) {
