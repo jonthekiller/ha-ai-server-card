@@ -1,91 +1,78 @@
 #!/bin/bash
-#
-# Returns AI backend metrics (vLLM or ds4-server) in HA-compatible JSON:
+# Returns AI backend metrics (vLLM, SGLang, or ds4-server) in HA-compatible JSON:
 #   {"running":N,"waiting":N,"ttft":N,"itl":N,"tokens":N,"model":"...","uptime":...}
-#
 # Auto-detects backend on the given port:
 #   - vLLM       (ports 10001/10002): vllm:* / num_requests_* metrics, filtered by model_name
+#   - SGLang:    sglang: metrics with model_name label filtering
 #   - ds4-server (port 10003):        ds4_* metrics, no per-model filtering (global)
-#
-# ds4-server mapping to neutral schema:
-#   running  = ds4_requests_inflight            (requests in flight)
-#   waiting  = 0                                (no queue metric available)
-#   ttft     = 0                                (no TTFT histogram exposed)
-#   itl      = 1000 / ds4_decode_tok_s          (ms per token, derived from decode rate)
-#   tokens   = ds4_tok_per_step                 (tokens per step == Tok/Iter)
+#   - SGLang fallback:                /get_server_info — extracts throughput + model
 
 PORT=$1
 MODEL=${2//\'/}   # strip quotes: HA passes 'Qwen3.6-27B'
 
-RAW=$(ssh -i /config/ssh_ai_server -o StrictHostKeyChecking=no USER@AI-SERVER-HOST \
-  "curl -s --max-time 5 localhost:${PORT}/metrics")
+SSH="ssh -i /config/ssh_ai_server -o StrictHostKeyChecking=no USER@AI-SERVER-HOST"
+
+RAW=$($SSH "curl -s --max-time 5 localhost:${PORT}/metrics")
+SVC_RESPONSE=$($SSH "curl -s --max-time 5 localhost:${PORT}/get_server_info" 2>/dev/null)
 
 # ── vLLM ──────────────────────────────────────────────────
 if echo "$RAW" | grep -q 'num_requests_running\|^vllm:'; then
-  # Get model from /v1/models endpoint
-  SVC_MODEL=$(ssh -i /config/ssh_ai_server -o StrictHostKeyChecking=no USER@AI-SERVER-HOST \
-    "curl -s --max-time 5 localhost:${PORT}/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-  # Get process_start_time from metrics to derive uptime
+  SVC_MODEL=$($SSH "curl -s --max-time 5 localhost:${PORT}/v1/models" 2>/dev/null | grep -o '"\\\\id":"[^"]*"' | head -1 | cut -d'"' -f4)
   START_TIME=$(echo "$RAW" | grep '^process_start_time_seconds' | awk '{print $2}')
   NOW=$(date +%s)
   UPTIME=0
   if [ -n "$START_TIME" ]; then
-    # Handle scientific notation (1.78594131134e+09)
     START_EPOCH=$(python3 -c "print(int($START_TIME))" 2>/dev/null || echo "$NOW")
     UPTIME=$(( NOW - START_EPOCH ))
   fi
+  # Use Python helper to parse metrics and clean model name
+  METRICS=$($SSH "python3 /config/scripts/llm_metrics.py $PORT '\$SVC_MODEL'")
+  echo "$METRICS"
+  exit 0
+fi
 
-  echo "$RAW" | grep "${MODEL}" | awk -v model="$SVC_MODEL" -v uptime="$UPTIME" '
-    BEGIN { r=0; w=0; ts=0; tn=0; os=0; on=0; tok=0; kv=0 }
-    /num_requests_running/      { r=$2 }
-    /num_requests_waiting/      { w=$2 }
-    /time_to_first_token_seconds_sum/   { ts=$2 }
-    /time_to_first_token_seconds_count/ { tn=$2 }
-    /time_per_output_token_seconds_sum/ { os=$2 }
-    /time_per_output_token_seconds_count/{ on=$2 }
-    /iteration_tokens_total_sum/        { tok=$2 }
-    /vllm:kv_cache_usage_perc/          { kv=$NF }
-    END {
-      ttft=(tn>0 ? ts/tn*1000 : 0);
-      itl=(on>0 ? os/on*1000 : 0);
-      ctx=(itl>0 ? 1000/itl : 0);
-      clean_model=(model != "" ? model : "unknown");
-      gsub(/"/, "\\\"", clean_model);
-      printf "{\"running\":%d,\"waiting\":%d,\"ttft\":%.0f,\"itl\":%.0f,\"tokens\":%s,\"ctx\":%.0f,\"model\":\"%s\",\"uptime\":%d}\n", r, w, ttft, itl, (itl>0 ? 1000/itl : 0), ctx, clean_model, uptime
-    }'
+# ── SGLang ────────────────────────────────────────────────
+if echo "$RAW" | grep -q 'sglang:num_running_reqs\|^sglang:'; then
+  SVC_MODEL=$($SSH "curl -s --max-time 5 localhost:${PORT}/v1/models" 2>/dev/null | grep -o '"\\\\id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  SG_START=$(echo "$RAW" | grep '^process_start_time_seconds' | awk '{print $2}')
+  SG_NOW=$(date +%s)
+  SG_UPTIME=0
+  if [ -n "$SG_START" ]; then
+    SG_START_EPOCH=$(python3 -c "print(int($SG_START))" 2>/dev/null || echo "$SG_NOW")
+    SG_UPTIME=$(( SG_NOW - SG_START_EPOCH ))
+  fi
+  # Use Python helper to parse metrics
+  METRICS=$($SSH "python3 /config/scripts/llm_metrics.py $PORT '\$SVC_MODEL'")
+  echo "$METRICS"
   exit 0
 fi
 
 # ── ds4-server ────────────────────────────────────────────
-# Get model from /v1/models endpoint
-DModel=$(ssh -i /config/ssh_ai_server -o StrictHostKeyChecking=no USER@AI-SERVER-HOST \
-  "curl -s --max-time 5 localhost:${PORT}/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-# Get uptime from process_start_time or ps aux
+DSModel=$($SSH "curl -s --max-time 5 localhost:${PORT}/v1/models" 2>/dev/null | grep -o '"\\\\id":"[^"]*"' | head -1 | cut -d'"' -f4)
 DS4_UPTIME=0
-START_TIME=$(echo "$RAW" | grep '^process_start_time_seconds' | awk '{print $2}')
-if [ -z "$START_TIME" ]; then
-  # Fallback: pgrep + stat /proc
+DS4_START=$(echo "$RAW" | grep '^process_start_time_seconds' | awk '{print $2}')
+if [ -z "$DS4_START" ]; then
   PID=$(pgrep -f "ds4-server.*--port ${PORT}" 2>/dev/null || echo "")
   if [ -n "$PID" ]; then
-    START_TIME=$(date -d "$(stat -c %Y /proc/$PID 2>/dev/null)" +%s 2>/dev/null || echo "")
+    DS4_START=$(date -d "$(stat -c %Y /proc/$PID 2>/dev/null)" +%s 2>/dev/null || echo "")
   fi
 fi
-NOW=$(date +%s)
-if [ -n "$START_TIME" ] && [ "$START_TIME" -gt 0 ] 2>/dev/null; then
-  DS4_UPTIME=$(( NOW - START_TIME ))
+DS4_NOW=$(date +%s)
+if [ -n "$DS4_START" ] && [ "$DS4_START" -gt 0 ] 2>/dev/null; then
+  DS4_UPTIME=$(( DS4_NOW - DS4_START ))
+fi
+if echo "$RAW" | grep -q '^ds4_'; then
+  # Use Python helper to parse metrics
+  METRICS=$($SSH "python3 /config/scripts/llm_metrics.py $PORT '\$DSModel'")
+  echo "$METRICS"
+  exit 0
 fi
 
-echo "$RAW" | awk -v model="$DModel" -v uptime="$DS4_UPTIME" '
-  BEGIN { r=0; w=0; dec=0; tok=0; kv=0 }
-  /ds4_requests_inflight/ { r=$2 }
-  /ds4_decode_tok_s/      { dec=$2 }
-  /ds4_tok_per_step/      { tok=$2 }
-  /ds4_kv_cache_usage/    { kv=$2 }
-  END {
-    itl=(dec>0 ? 1000/dec : 0);
-    clean_model=(model != "" ? model : "unknown");
-    gsub(/"/, "\\\"", clean_model);
-    printf "{\"running\":%d,\"waiting\":%d,\"ttft\":0,\"itl\":%.0f,\"tokens\":%.0f,\"ctx\":%.0f,\"model\":\"%s\",\"uptime\":%d}\n", r, w, itl, dec, kv*100, clean_model, uptime
-  }'
+# ── SGLang fallback /get_server_info ──────────────────────
+if [ -n "$SVC_RESPONSE" ] && echo "$SVC_RESPONSE" | grep -q 'model_name'; then
+  python3 -c "import json, sys; d = json.loads(sys.argv[1]); gen_tp = float(d.get('last_gen_throughput', 0) or 0); prefill_tp = float(d.get('last_prefill_throughput', 0) or 0); model = d.get('model_name', 'unknown'); itl = 1000 / gen_tp if gen_tp > 0 else 0; tokens = gen_tp + prefill_tp; print(json.dumps({'running': 0, 'waiting': 0, 'ttft': 0, 'itl': round(itl), 'tokens': round(tokens), 'ctx': round(tokens), 'model': model, 'uptime': 0}))" "$SVC_RESPONSE"
+  exit 0
+fi
+
+# ── Unknown backend ───────────────────────────────────────
+echo '{"running":0,"waiting":0,"ttft":0,"itl":0,"tokens":0,"ctx":0,"model":"unknown","uptime":0}'
