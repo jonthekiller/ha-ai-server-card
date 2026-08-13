@@ -53,13 +53,14 @@ sensor:
     value_template: "{{ value.strip() | float }}"
 
   # ── LLM Metrics (via llm_metrics.sh) ──────────────────
-  # Outputs JSON: running, waiting, ttft, itl, tokens, ctx, model, uptime
-  # model = serving model ID from /v1/models (vLLM) or /v1/models (ds4-server)
-  # uptime = seconds since process start
+  # Auto-detects backend: vLLM, SGLang, or ds4-server
+  # Args: PORT [MODEL] [DOCKER_CONTAINER] [MODEL_DIR]
+  # Outputs JSON: status, running, waiting, ttft, itl, tokens, ctx, model, uptime
   - platform: command_line
     name: "vLLM Metrics"
     command: "bash /config/scripts/llm_metrics.sh 10002 'your-model-name'"
     json_attributes:
+      - status
       - running
       - waiting
       - ttft
@@ -69,12 +70,13 @@ sensor:
       - model
       - uptime
     scan_interval: 15
-    value_template: "{{ value_json.running | default(0) }}"
+    value_template: "{{ value_json.status }}"
 
   - platform: command_line
     name: "vLLM Metrics 2"
     command: "bash /config/scripts/llm_metrics.sh 10001 'your-model-name-2'"
     json_attributes:
+      - status
       - running
       - waiting
       - ttft
@@ -84,12 +86,13 @@ sensor:
       - model
       - uptime
     scan_interval: 15
-    value_template: "{{ value_json.running | default(0) }}"
+    value_template: "{{ value_json.status }}"
 
   - platform: command_line
     name: "vLLM Metrics 3"
     command: "bash /config/scripts/llm_metrics.sh 10003 'your-model-name-3'"
     json_attributes:
+      - status
       - running
       - waiting
       - ttft
@@ -99,4 +102,4 @@ sensor:
       - model
       - uptime
     scan_interval: 15
-    value_template: "{{ value_json.running | default(0) }}"
+    value_template: "{{ value_json.status }}"

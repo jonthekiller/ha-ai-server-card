@@ -75,6 +75,7 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
      name: "LLM Metrics"
      command: "bash /config/scripts/llm_metrics.sh 10002 'your-model-name'"
      json_attributes:
+       - status      # running / stopped / starting / restarting
        - running
        - waiting
        - ttft
@@ -84,17 +85,20 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
        - model
        - uptime
      scan_interval: 15
-     value_template: "{{ value_json.running | default(0) }}"
+     value_template: "{{ value_json.status }}"
    ```
 
-**Usage:** `llm_metrics.sh PORT [MODEL]`
+**Usage:** `llm_metrics.sh PORT [MODEL] [DOCKER_CONTAINER] [MODEL_DIR]`
 - `PORT` — metrics endpoint port (e.g. `10002`)
-- `MODEL` — optional model name for vLLM attribute (auto-detected if omitted)
+- `MODEL` — optional model name (auto-detected from `/v1/models` if omitted)
+- `DOCKER_CONTAINER` — optional container name for Docker health-based status
+- `MODEL_DIR` — optional model dir for PID file (default: `/home/jonthekiller/docker/models/${MODEL}/`)
 
-**Output:** `{"running":3,"waiting":0,"ttft":450,"itl":85,"tokens":256,"ctx":12000,"model":"Qwen3.6-27B","uptime":86400}`
+**Output:** `{"status":"healthy","running":3,"waiting":0,"ttft":450,"itl":85,"tokens":256,"ctx":12000,"model":"Qwen3.6-27B","uptime":86400}`
 
 | Field | Description |
 |-------|-------------|
+| `status` | Service status (healthy, stopped, starting, restarting) |
 | `running` | Concurrent requests |
 | `waiting` | Queue depth |
 | `ttft` | Time to First Token (ms) |
