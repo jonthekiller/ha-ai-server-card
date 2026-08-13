@@ -98,9 +98,9 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
 
 | Field | Description |
 |-------|-------------|
-| `status` | Service status (healthy, stopped, starting, restarting) |
-| `running` | Concurrent requests |
-| `waiting` | Queue depth |
+| `status` | Service status (running, stopped, starting, restarting) |
+| `running` | Active requests |
+| `waiting` | Queued requests |
 | `ttft` | Time to First Token (ms) |
 | `itl` | Inter-Token Latency (ms) |
 | `tokens` | Tokens per iteration |
