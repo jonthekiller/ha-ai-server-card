@@ -15,7 +15,7 @@
 PORT=${1:-10002}
 MODEL=${2:-}
 CONTAINER=${3:-}
-MODEL_DIR=${4:-/home/jonthekiller/docker/models/${MODEL}/}
+MODEL_DIR=${4:-${MODEL}/}
 
 SSH="ssh -i /config/ssh_ai_server -o StrictHostKeyChecking=no -o ConnectTimeout=3 USER@AI-SERVER-HOST"
 

@@ -92,7 +92,7 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
 - `PORT` — metrics endpoint port (e.g. `10002`)
 - `MODEL` — optional model name (auto-detected from `/v1/models` if omitted)
 - `DOCKER_CONTAINER` — optional container name for Docker health-based status
-- `MODEL_DIR` — optional model dir for PID file (default: `/home/jonthekiller/docker/models/${MODEL}/`)
+- `MODEL_DIR` — optional model dir for PID file (default: `${MODEL}/`)
 
 **Output:** `{"status":"healthy","running":3,"waiting":0,"ttft":450,"itl":85,"tokens":256,"ctx":12000,"model":"Qwen3.6-27B","uptime":86400}`
 
