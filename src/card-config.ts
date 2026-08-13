@@ -19,11 +19,7 @@ export interface CustomAction {
  */
 export interface ServiceConfig {
   name: string;
-  status_entity?: string;
-  // Info
-  model_entity?: string;
-  uptime_entity?: string;
-  // vLLM performance metrics (single JSON sensor)
+  // vLLM performance metrics (single JSON sensor) — also provides status, model, uptime
   metrics_entity?: string;
   // Actions (per-service)
   start_service?: string;

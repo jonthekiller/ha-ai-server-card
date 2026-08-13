@@ -550,12 +550,12 @@ export class LlmServerCardEditor extends HTMLElement {
 
   private _tabBasic(service: ServiceConfig, idx: number): HTMLDivElement {
     const container = document.createElement('div');
+
     container.appendChild(
-      this._entityField(
-        'Status entity (required)',
-        (service as any).status_entity ?? '',
-        (v) => this._setService(idx, 'status_entity', v),
-        ['sensor', 'binary_sensor'],
+      this._makeField(
+        'Service name',
+        service.name ?? '',
+        (v) => this._setService(idx, 'name', v.trim() || `Service ${idx + 1}`),
       ),
     );
 
@@ -598,40 +598,20 @@ export class LlmServerCardEditor extends HTMLElement {
     const perfLabel = document.createElement('div');
     perfLabel.className = 'label';
     perfLabel.style.cssText = 'margin-bottom:4px;margin-top:4px;';
-    perfLabel.textContent = 'Performance';
+    perfLabel.textContent = 'Metrics';
     container.appendChild(perfLabel);
 
     const perfGrid = document.createElement('div');
     perfGrid.className = 'entity-grid';
     perfGrid.appendChild(
       this._entityField(
-        'vLLM metrics entity',
+        'Metrics entity (JSON sensor — also provides status)',
         (service as any).metrics_entity ?? '',
         (v) => this._setService(idx, 'metrics_entity', v),
         ['sensor'],
       ),
     );
     container.appendChild(perfGrid);
-
-    const infoLabel = document.createElement('div');
-    infoLabel.className = 'label';
-    infoLabel.style.cssText = 'margin-bottom:4px;margin-top:8px;';
-    infoLabel.textContent = 'Info';
-    container.appendChild(infoLabel);
-
-    const infoGrid = document.createElement('div');
-    infoGrid.className = 'entity-grid';
-    container.appendChild(infoGrid);
-    [
-      ['model_entity', 'Model entity'],
-      ['uptime_entity', 'Uptime entity'],
-    ].forEach(([key, lbl]) => {
-      infoGrid.appendChild(
-        this._entityField(lbl, (service as any)[key] ?? '', (v) => this._setService(idx, key, v), [
-          'sensor',
-        ]),
-      );
-    });
 
     return container;
   }

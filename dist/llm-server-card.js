@@ -1387,7 +1387,7 @@ const cardStyles = i$4`
 const CARD_NAME = "llm-server-card";
 const EDITOR_NAME = "llm-server-card-editor";
 const DEFAULT_REFRESH_INTERVAL = 30;
-const CARD_VERSION = "2026-08-10-20:35:28";
+const CARD_VERSION = "2026-08-13-19:15:32";
 function getMetricColorClass(value) {
   if (value >= 90) return "critical";
   if (value >= 75) return "warning";
@@ -1954,11 +1954,10 @@ let LlmServerCardEditor = class extends HTMLElement {
   _tabBasic(service, idx) {
     const container = document.createElement("div");
     container.appendChild(
-      this._entityField(
-        "Status entity (required)",
-        service.status_entity ?? "",
-        (v2) => this._setService(idx, "status_entity", v2),
-        ["sensor", "binary_sensor"]
+      this._makeField(
+        "Service name",
+        service.name ?? "",
+        (v2) => this._setService(idx, "name", v2.trim() || `Service ${idx + 1}`)
       )
     );
     const styleLabel = document.createElement("div");
@@ -1994,37 +1993,19 @@ let LlmServerCardEditor = class extends HTMLElement {
     const perfLabel = document.createElement("div");
     perfLabel.className = "label";
     perfLabel.style.cssText = "margin-bottom:4px;margin-top:4px;";
-    perfLabel.textContent = "Performance";
+    perfLabel.textContent = "Metrics";
     container.appendChild(perfLabel);
     const perfGrid = document.createElement("div");
     perfGrid.className = "entity-grid";
     perfGrid.appendChild(
       this._entityField(
-        "vLLM metrics entity",
+        "Metrics entity (JSON sensor — also provides status)",
         service.metrics_entity ?? "",
         (v2) => this._setService(idx, "metrics_entity", v2),
         ["sensor"]
       )
     );
     container.appendChild(perfGrid);
-    const infoLabel = document.createElement("div");
-    infoLabel.className = "label";
-    infoLabel.style.cssText = "margin-bottom:4px;margin-top:8px;";
-    infoLabel.textContent = "Info";
-    container.appendChild(infoLabel);
-    const infoGrid = document.createElement("div");
-    infoGrid.className = "entity-grid";
-    container.appendChild(infoGrid);
-    [
-      ["model_entity", "Model entity"],
-      ["uptime_entity", "Uptime entity"]
-    ].forEach(([key, lbl]) => {
-      infoGrid.appendChild(
-        this._entityField(lbl, service[key] ?? "", (v2) => this._setService(idx, key, v2), [
-          "sensor"
-        ])
-      );
-    });
     return container;
   }
   /* ── Tab: Actions ─────────────────────────── */
@@ -2574,9 +2555,8 @@ let LlmServerCard = class extends i$1 {
   _renderServiceCard(service, options) {
     const status = this._getServiceStatus(service);
     const icon = service.icon || getServiceIcon(service.name);
-    const modelEntity = service.model_entity ? this.hass?.states[service.model_entity] : void 0;
     const modelFromMetrics = service.metrics_entity ? this.hass?.states[service.metrics_entity]?.attributes?.model : void 0;
-    const model = options.show_model !== false ? modelEntity?.state || modelFromMetrics : void 0;
+    const model = options.show_model !== false ? modelFromMetrics : void 0;
     const expanded = this._isServiceExpanded(service.name, !!options.compact);
     return b`
       <div class="service-card" style="--service-color: ${service.color || "var(--primary-color)"}">
@@ -2694,13 +2674,10 @@ let LlmServerCard = class extends i$1 {
   }
   _renderUptime(service, options) {
     if (options.show_uptime === false) return b``;
-    const uptimeEntity = service.uptime_entity ? this.hass?.states[service.uptime_entity] : void 0;
     const uptimeFromMetrics = service.metrics_entity ? this.hass?.states[service.metrics_entity]?.attributes?.uptime : void 0;
-    const uptimeVal = uptimeEntity?.state || uptimeFromMetrics;
-    if (!uptimeVal && !uptimeEntity) return b``;
-    const isUnavailable = !uptimeVal || this._isEntityUnavailable(uptimeEntity) ? uptimeFromMetrics ? false : true : false;
+    const uptimeVal = uptimeFromMetrics;
+    if (!uptimeVal) return b``;
     const displayUptime = () => {
-      if (!uptimeVal) return "—";
       const secs = Number(uptimeVal);
       if (!isNaN(secs) && secs > 0) return formatUptime(secs);
       return uptimeVal;
@@ -2708,11 +2685,6 @@ let LlmServerCard = class extends i$1 {
     return b`<div class="service-uptime">
       <ha-icon icon="mdi:clock-outline"></ha-icon>
       <span>${displayUptime()}</span>
-      ${isUnavailable ? b`<ha-icon
-              class="entity-warning"
-              icon="mdi:alert-circle-outline"
-              title="Entity unavailable"
-            ></ha-icon>` : ""}
     </div>`;
   }
   _renderActions(service, status) {
@@ -2780,28 +2752,27 @@ let LlmServerCard = class extends i$1 {
   _getServiceStatus(service) {
     const pending = this._pendingStatuses.get(service.name);
     if (pending) {
-      if (service.status_entity && this.hass) {
-        const entity2 = this.hass.states[service.status_entity];
+      if (service.metrics_entity && this.hass) {
+        const entity2 = this.hass.states[service.metrics_entity];
         if (entity2) {
-          const lower2 = entity2.state.toLowerCase();
-          if ((pending.status === "restarting" || pending.status === "starting") && (lower2.includes("running") || lower2 === "ready")) {
+          const statusAttr2 = entity2.attributes?.status?.toLowerCase();
+          if ((pending.status === "restarting" || pending.status === "starting") && (statusAttr2 === "healthy" || statusAttr2 === "starting")) {
             this._clearPendingStatus(service.name);
-          } else if (pending.status === "stopped" && (lower2.includes("stopped") || lower2 === "off" || lower2 === "down")) {
+          } else if (pending.status === "stopped" && (statusAttr2 === "stopped" || statusAttr2 === "unhealthy")) {
             this._clearPendingStatus(service.name);
           }
         }
       }
       return pending.status;
     }
-    if (!service.status_entity || !this.hass) return "unknown";
-    const entity = this.hass.states[service.status_entity];
+    if (!service.metrics_entity || !this.hass) return "unknown";
+    const entity = this.hass.states[service.metrics_entity];
     if (!entity) return "unknown";
-    const lower = entity.state.toLowerCase();
-    if (lower.includes("running") || lower === "on" || lower === "ready") return "running";
-    if (lower.includes("stopped") || lower.includes("exited") || lower === "off" || lower === "down")
-      return "stopped";
-    if (lower === "starting") return "starting";
-    if (lower.includes("restarting") || lower.includes("created")) return "restarting";
+    const statusAttr = entity.attributes?.status?.toLowerCase();
+    if (statusAttr === "healthy") return "running";
+    if (statusAttr === "stopped") return "stopped";
+    if (statusAttr === "starting") return "starting";
+    if (statusAttr === "unhealthy") return "restarting";
     return "unknown";
   }
   _setPendingStatus(serviceName, status) {

@@ -337,12 +337,11 @@ export class LlmServerCard extends LitElement {
   private _renderServiceCard(service: ServiceConfig, options: DisplayOptions) {
     const status = this._getServiceStatus(service);
     const icon = service.icon || getServiceIcon(service.name);
-    // Model: show_model toggle + model_entity (or fallback to metrics_entity attributes)
-    const modelEntity = service.model_entity ? this.hass?.states[service.model_entity] : undefined;
+    // Model: show_model toggle + metrics_entity.attributes.model
     const modelFromMetrics = service.metrics_entity
       ? (this.hass?.states[service.metrics_entity]?.attributes?.model as string | undefined)
       : undefined;
-    const model = options.show_model !== false ? modelEntity?.state || modelFromMetrics : undefined;
+    const model = options.show_model !== false ? modelFromMetrics : undefined;
     const expanded = this._isServiceExpanded(service.name, !!options.compact);
 
     return html`
@@ -473,25 +472,14 @@ export class LlmServerCard extends LitElement {
   private _renderUptime(service: ServiceConfig, options: DisplayOptions): TemplateResult {
     if (options.show_uptime === false) return html``;
 
-    const uptimeEntity = service.uptime_entity
-      ? this.hass?.states[service.uptime_entity]
-      : undefined;
     const uptimeFromMetrics = service.metrics_entity
       ? (this.hass?.states[service.metrics_entity]?.attributes?.uptime as string | undefined)
       : undefined;
 
-    const uptimeVal = uptimeEntity?.state || uptimeFromMetrics;
-    if (!uptimeVal && !uptimeEntity) return html``;
-
-    const isUnavailable =
-      !uptimeVal || this._isEntityUnavailable(uptimeEntity)
-        ? uptimeFromMetrics
-          ? false
-          : true
-        : false;
+    const uptimeVal = uptimeFromMetrics;
+    if (!uptimeVal) return html``;
 
     const displayUptime = () => {
-      if (!uptimeVal) return '—';
       const secs = Number(uptimeVal);
       if (!isNaN(secs) && secs > 0) return formatUptime(secs);
       return uptimeVal;
@@ -499,15 +487,6 @@ export class LlmServerCard extends LitElement {
     return html`<div class="service-uptime">
       <ha-icon icon="mdi:clock-outline"></ha-icon>
       <span>${displayUptime()}</span>
-      ${
-        isUnavailable
-          ? html`<ha-icon
-              class="entity-warning"
-              icon="mdi:alert-circle-outline"
-              title="Entity unavailable"
-            ></ha-icon>`
-          : ''
-      }
     </div>`;
   }
 
@@ -588,18 +567,18 @@ export class LlmServerCard extends LitElement {
     const pending = this._pendingStatuses.get(service.name);
     if (pending) {
       // Clear if HA state has caught up
-      if (service.status_entity && this.hass) {
-        const entity = this.hass.states[service.status_entity];
+      if (service.metrics_entity && this.hass) {
+        const entity = this.hass.states[service.metrics_entity];
         if (entity) {
-          const lower = entity.state.toLowerCase();
+          const statusAttr = (entity.attributes?.status as string | undefined)?.toLowerCase();
           if (
             (pending.status === 'restarting' || pending.status === 'starting') &&
-            (lower.includes('running') || lower === 'ready')
+            (statusAttr === 'healthy' || statusAttr === 'starting')
           ) {
             this._clearPendingStatus(service.name);
           } else if (
             pending.status === 'stopped' &&
-            (lower.includes('stopped') || lower === 'off' || lower === 'down')
+            (statusAttr === 'stopped' || statusAttr === 'unhealthy')
           ) {
             this._clearPendingStatus(service.name);
           }
@@ -608,21 +587,16 @@ export class LlmServerCard extends LitElement {
       return pending.status;
     }
 
-    if (!service.status_entity || !this.hass) return 'unknown';
-    const entity = this.hass.states[service.status_entity];
+    // Read status from metrics_entity.attributes.status
+    if (!service.metrics_entity || !this.hass) return 'unknown';
+    const entity = this.hass.states[service.metrics_entity];
     if (!entity) return 'unknown';
 
-    const lower = entity.state.toLowerCase();
-    if (lower.includes('running') || lower === 'on' || lower === 'ready') return 'running';
-    if (
-      lower.includes('stopped') ||
-      lower.includes('exited') ||
-      lower === 'off' ||
-      lower === 'down'
-    )
-      return 'stopped';
-    if (lower === 'starting') return 'starting';
-    if (lower.includes('restarting') || lower.includes('created')) return 'restarting';
+    const statusAttr = (entity.attributes?.status as string | undefined)?.toLowerCase();
+    if (statusAttr === 'healthy') return 'running';
+    if (statusAttr === 'stopped') return 'stopped';
+    if (statusAttr === 'starting') return 'starting';
+    if (statusAttr === 'unhealthy') return 'restarting';
     return 'unknown';
   }
 
