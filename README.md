@@ -2,7 +2,7 @@
 
 A custom Home Assistant Lovelace card for managing AI inference servers. Monitor status, GPU/RAM/temperature metrics, and control services directly from your dashboard.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Screenshots
@@ -63,7 +63,7 @@ Copy `sensors-ai-server.yaml` and `shell_command-ai-server.yaml` to `/config/` o
 
 ### 3. LLM Metrics Script (Recommended)
 
-The `scripts/llm_metrics.sh` script provides a single JSON sensor for all inference metrics. It **auto-detects** whether the backend is vLLM or ds4-server — and adapts accordingly.
+The `scripts/llm_metrics.sh` script provides a single JSON sensor for all inference metrics. It **auto-detects** the backend: vLLM, SGLang, or ds4-server — and adapts accordingly. Status detection uses Docker health when a container name is provided.
 
 **Setup:**
 1. Copy `scripts/llm_metrics.sh` to your AI server (e.g. `/config/scripts/llm_metrics.sh`)
@@ -89,7 +89,7 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
 
 **Usage:** `llm_metrics.sh PORT [MODEL]`
 - `PORT` — metrics endpoint port (e.g. `10002`)
-- `MODEL` — model name for vLLM filtering (ignored for ds4-server)
+- `MODEL` — optional model name for vLLM attribute (auto-detected if omitted)
 
 **Output:** `{"running":3,"waiting":0,"ttft":450,"itl":85,"tokens":256,"ctx":12000,"model":"Qwen3.6-27B","uptime":86400}`
 
@@ -118,9 +118,6 @@ services:
   - name: "Service 1"
     icon: "mdi:cpu-64-bit"
     color: "#4fc3f7"
-    status_entity: sensor.service_1_status
-    model_entity: sensor.service_1_model
-    uptime_entity: sensor.service_1_uptime
     metrics_entity: sensor.llm_metrics_1
     start_service: shell_command.service_1_start
     stop_service: shell_command.service_1_stop
@@ -167,13 +164,10 @@ In the visual editor, use the "Host Custom Actions" section. The icon field auto
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `services[].name` | string | — | Service display name |
+| `services[].name` | string | — | Service display name (editable in visual editor) |
 | `services[].icon` | string | auto | MDI icon name |
 | `services[].color` | string | — | Custom service color (hex) |
-| `services[].status_entity` | string | — | HA entity for status |
-| `services[].model_entity` | string | — | HA entity for current model |
-| `services[].metrics_entity` | string | — | HA entity for inference performance (JSON: running, waiting, ttft, itl, tokens, ctx, model, uptime) |
-| `services[].uptime_entity` | string | — | HA entity for uptime |
+| `services[].metrics_entity` | string | — | HA entity for all metrics (JSON: status, model, uptime, running, waiting, ttft, itl, tokens, ctx) |
 | `services[].start_service` | string | — | HA service to start |
 | `services[].stop_service` | string | — | HA service to stop |
 | `services[].restart_service` | string | — | HA service to restart |
@@ -222,9 +216,25 @@ DGX Spark uses **Unified Memory Architecture (UMA)** where CPU and GPU share a 1
 | GPU Usage | `nvidia-smi --query-gpu=utilization.gpu` | 15s |
 | GPU Temp | `nvidia-smi --query-gpu=temperature.gpu` | 30s |
 | UMA Memory | `free -m \| awk 'NR==2{printf "%.1f", \$3/\$2*100}'` | 15s |
-| LLM Status | `docker inspect --format='{{.State.Status}}' vllm` | 30s |
-| LLM Model | `curl localhost:8000/v1/models \| jq` | 5min |
-| LLM Metrics | `bash /config/scripts/llm_metrics.sh 10002 'model'` | 15s |
+| LLM Status + Metrics | `bash /config/scripts/llm_metrics.sh 10002 'model'` | 15s |
+
+## Visual Editor
+
+Edit the card directly from the HA dashboard UI:
+
+- **Basic tab** — Service name, icon, color
+- **Entities tab** — Metrics sensor picker
+- **Actions tab** — Start/stop/restart/logs service bindings
+
+## Changelog
+
+### v1.2.0
+- Editor: service **name** now editable in visual editor (Basic tab)
+- Editor: removed empty "Info" section from Entities tab
+- `llm_metrics.sh`: Docker health-based status detection, improved vLLM/SGLang/ds4 parsing
+
+### v1.1.0
+- (previous release)
 
 ## License
 
