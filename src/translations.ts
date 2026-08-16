@@ -30,6 +30,7 @@ export const translations: Record<string, TranslationMessages> = {
       start: '{name}: Start',
       stop: '{name}: Stop',
       restart: '{name}: Restart',
+      action_executed: '{name} executed on {service}',
       failed: 'Failed: {name}',
     },
     action: {
@@ -42,7 +43,7 @@ export const translations: Record<string, TranslationMessages> = {
     perf: {
       running: 'Running',
       waiting: 'Waiting',
-      tok_iter: 'Gen tok/s',
+      tps: 'Gen tok/s',
       ttft: 'TTFT',
       itl: 'ITL',
     },
@@ -71,6 +72,7 @@ export const translations: Record<string, TranslationMessages> = {
       start: '{name} : Démarrage',
       stop: '{name} : Arrêt',
       restart: '{name} : Redémarrage',
+      action_executed: '{name} exécuté sur {service}',
       failed: 'Échec : {name}',
     },
     action: {
@@ -83,7 +85,7 @@ export const translations: Record<string, TranslationMessages> = {
     perf: {
       running: 'En cours',
       waiting: 'En attente',
-      tok_iter: 'Gen tok/s',
+      tps: 'Gen tok/s',
       ttft: 'TTFT',
       itl: 'ITL',
     },

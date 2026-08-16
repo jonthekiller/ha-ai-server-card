@@ -55,7 +55,7 @@ sensor:
   # ── LLM Metrics (via llm_metrics.sh) ──────────────────
   # Auto-detects backend: vLLM, SGLang, or ds4-server
   # Args: PORT [MODEL] [DOCKER_CONTAINER] [MODEL_DIR]
-  # Outputs JSON: status, running, waiting, ttft, itl, tokens, ctx, model, uptime
+  # Outputs JSON: status, running, waiting, ttft, itl, tps, model, uptime
   - platform: command_line
     name: "vLLM Metrics"
     command: "bash /config/scripts/llm_metrics.sh 10002 'your-model-name'"
@@ -65,8 +65,7 @@ sensor:
       - waiting
       - ttft
       - itl
-      - tokens
-      - ctx
+      - tps
       - model
       - uptime
     scan_interval: 15
@@ -81,8 +80,7 @@ sensor:
       - waiting
       - ttft
       - itl
-      - tokens
-      - ctx
+      - tps
       - model
       - uptime
     scan_interval: 15
@@ -97,8 +95,7 @@ sensor:
       - waiting
       - ttft
       - itl
-      - tokens
-      - ctx
+      - tps
       - model
       - uptime
     scan_interval: 15

@@ -44,13 +44,33 @@ function defaultOptions(): DisplayOptions {
     show_performance: true,
     show_running: true,
     show_waiting: true,
-    show_tok_iter: true,
+      show_tps: true,
     show_ttft: true,
     show_itl: true,
     refresh_interval: 30,
     compact: false,
   };
 }
+
+/* ── Common MDI icons (autocomplete for host action icons) ── */
+
+const MDI_ICON_LIST = [
+  'console-line', 'console', 'terminal', 'terminal-square', 'server', 'server-network', 'nginx',
+  'refresh', 'refresh-circle', 'restart', 'restart-alert', 'power', 'power-off', 'play', 'stop',
+  'pause', 'play-pause', 'sync', 'sync-circle', 'cog', 'cog-outline', 'settings', 'tools',
+  'hammer-wrench', 'wrench', 'rocket-launch', 'rocket-launch-outline', 'database', 'database-check',
+  'database-export', 'database-import', 'file-document-outline', 'file-document-edit', 'clipboard-text',
+  'bell', 'bell-ring', 'notification-clear-all', 'message', 'message-text', 'email', 'share', 'link',
+  'lock', 'lock-open', 'shield', 'shield-check', 'shield-alert', 'bug', 'bug-outline', 'magnify',
+  'magnify-scan', 'chart-line', 'chart-bar', 'counter', 'timer', 'clock-outline', 'history', 'archive',
+  'package', 'package-variant', 'harddisk', 'harddisk-remove', 'memory', 'chip', 'chip-off',
+  'thermometer', 'thermometer-high', 'flash', 'battery', 'battery-charging', 'network', 'laptop',
+  'monitor', 'desktop-tower', 'router', 'wifi', 'ethernet-cable', 'usb', 'alert', 'alert-circle',
+  'alert-circle-outline', 'check', 'check-circle', 'check-all', 'close', 'close-circle', 'plus',
+  'minus', 'arrow-up', 'arrow-down', 'swap-horizontal', 'eye', 'eye-off', 'home', 'truck', 'sun',
+  'moon', 'cloud-download', 'cloud-upload', 'delete', 'delete-scan', 'trash-can-outline', 'broom',
+  'broom-variant', 'vacuum', 'fan', 'snowflake', 'fire',
+];
 
 /* ── Decorator fallback ───────────────────────── */
 
@@ -237,6 +257,16 @@ export class LlmServerCardEditor extends HTMLElement {
     }
     container.appendChild(dl);
 
+    // Datalist of common MDI icons for host action icons
+    const iconDl = document.createElement('datalist');
+    iconDl.id = 'ha-ai-icons';
+    for (const name of MDI_ICON_LIST) {
+      const opt = document.createElement('option');
+      opt.value = `mdi:${name}`;
+      iconDl.appendChild(opt);
+    }
+    container.appendChild(iconDl);
+
     hostActions.forEach((act, ai) => {
       const row = document.createElement('div');
       row.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px;';
@@ -355,7 +385,7 @@ export class LlmServerCardEditor extends HTMLElement {
       ['show_waiting', 'Waiting'],
       ['show_ttft', 'TTFT'],
       ['show_itl', 'ITL'],
-      ['show_tok_iter', 'Gen tok/s'],
+      ['show_tps', 'Gen tok/s'],
     ].forEach(([key, label]) => {
       pfDiv.appendChild(
         this._makeToggle(key, label, (opts as any)[key], (v) => this._setOption(key, v)),

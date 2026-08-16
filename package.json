@@ -1,6 +1,6 @@
 {
   "name": "ha-ai-server-card",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "Home Assistant Lovelace card for managing AI inference servers",
   "main": "dist/llm-server-card.js",
   "scripts": {

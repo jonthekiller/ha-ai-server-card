@@ -9,7 +9,6 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/llm-server-card.ts'),
       formats: ['es'],
-      fileName: (format) => `ha-ai-server-card.${format === 'es' ? 'js' : 'cjs'}`,
     },
     rollupOptions: {
       output: {

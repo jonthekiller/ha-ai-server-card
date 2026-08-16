@@ -1387,7 +1387,7 @@ const cardStyles = i$4`
 const CARD_NAME = "llm-server-card";
 const EDITOR_NAME = "llm-server-card-editor";
 const DEFAULT_REFRESH_INTERVAL = 30;
-const CARD_VERSION = "2026-08-13-19:15:32";
+const CARD_VERSION = "2026-08-16-15:59:13";
 function getMetricColorClass(value) {
   if (value >= 90) return "critical";
   if (value >= 75) return "warning";
@@ -1437,6 +1437,7 @@ const translations = {
       start: "{name}: Start",
       stop: "{name}: Stop",
       restart: "{name}: Restart",
+      action_executed: "{name} executed on {service}",
       failed: "Failed: {name}"
     },
     action: {
@@ -1449,7 +1450,7 @@ const translations = {
     perf: {
       running: "Running",
       waiting: "Waiting",
-      tok_iter: "Gen tok/s",
+      tps: "Gen tok/s",
       ttft: "TTFT",
       itl: "ITL"
     },
@@ -1478,6 +1479,7 @@ const translations = {
       start: "{name} : Démarrage",
       stop: "{name} : Arrêt",
       restart: "{name} : Redémarrage",
+      action_executed: "{name} exécuté sur {service}",
       failed: "Échec : {name}"
     },
     action: {
@@ -1490,7 +1492,7 @@ const translations = {
     perf: {
       running: "En cours",
       waiting: "En attente",
-      tok_iter: "Gen tok/s",
+      tps: "Gen tok/s",
       ttft: "TTFT",
       itl: "ITL"
     },
@@ -1536,13 +1538,123 @@ function defaultOptions() {
     show_performance: true,
     show_running: true,
     show_waiting: true,
-    show_tok_iter: true,
+    show_tps: true,
     show_ttft: true,
     show_itl: true,
     refresh_interval: 30,
     compact: false
   };
 }
+const MDI_ICON_LIST = [
+  "console-line",
+  "console",
+  "terminal",
+  "terminal-square",
+  "server",
+  "server-network",
+  "nginx",
+  "refresh",
+  "refresh-circle",
+  "restart",
+  "restart-alert",
+  "power",
+  "power-off",
+  "play",
+  "stop",
+  "pause",
+  "play-pause",
+  "sync",
+  "sync-circle",
+  "cog",
+  "cog-outline",
+  "settings",
+  "tools",
+  "hammer-wrench",
+  "wrench",
+  "rocket-launch",
+  "rocket-launch-outline",
+  "database",
+  "database-check",
+  "database-export",
+  "database-import",
+  "file-document-outline",
+  "file-document-edit",
+  "clipboard-text",
+  "bell",
+  "bell-ring",
+  "notification-clear-all",
+  "message",
+  "message-text",
+  "email",
+  "share",
+  "link",
+  "lock",
+  "lock-open",
+  "shield",
+  "shield-check",
+  "shield-alert",
+  "bug",
+  "bug-outline",
+  "magnify",
+  "magnify-scan",
+  "chart-line",
+  "chart-bar",
+  "counter",
+  "timer",
+  "clock-outline",
+  "history",
+  "archive",
+  "package",
+  "package-variant",
+  "harddisk",
+  "harddisk-remove",
+  "memory",
+  "chip",
+  "chip-off",
+  "thermometer",
+  "thermometer-high",
+  "flash",
+  "battery",
+  "battery-charging",
+  "network",
+  "laptop",
+  "monitor",
+  "desktop-tower",
+  "router",
+  "wifi",
+  "ethernet-cable",
+  "usb",
+  "alert",
+  "alert-circle",
+  "alert-circle-outline",
+  "check",
+  "check-circle",
+  "check-all",
+  "close",
+  "close-circle",
+  "plus",
+  "minus",
+  "arrow-up",
+  "arrow-down",
+  "swap-horizontal",
+  "eye",
+  "eye-off",
+  "home",
+  "truck",
+  "sun",
+  "moon",
+  "cloud-download",
+  "cloud-upload",
+  "delete",
+  "delete-scan",
+  "trash-can-outline",
+  "broom",
+  "broom-variant",
+  "vacuum",
+  "fan",
+  "snowflake",
+  "fire"
+];
 function customElement(name) {
   return function(cls) {
     if (!customElements.get(name)) customElements.define(name, cls);
@@ -1684,6 +1796,14 @@ let LlmServerCardEditor = class extends HTMLElement {
       dl.appendChild(opt);
     }
     container.appendChild(dl);
+    const iconDl = document.createElement("datalist");
+    iconDl.id = "ha-ai-icons";
+    for (const name of MDI_ICON_LIST) {
+      const opt = document.createElement("option");
+      opt.value = `mdi:${name}`;
+      iconDl.appendChild(opt);
+    }
+    container.appendChild(iconDl);
     hostActions.forEach((act, ai) => {
       const row = document.createElement("div");
       row.style.cssText = "display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px;";
@@ -1788,7 +1908,7 @@ let LlmServerCardEditor = class extends HTMLElement {
       ["show_waiting", "Waiting"],
       ["show_ttft", "TTFT"],
       ["show_itl", "ITL"],
-      ["show_tok_iter", "Gen tok/s"]
+      ["show_tps", "Gen tok/s"]
     ].forEach(([key, label]) => {
       pfDiv.appendChild(
         this._makeToggle(key, label, opts[key], (v2) => this._setOption(key, v2))
@@ -2362,7 +2482,7 @@ let LlmServerCard = class extends i$1 {
         show_waiting: true,
         show_ttft: true,
         show_itl: true,
-        show_tok_iter: true,
+        show_tps: true,
         refresh_interval: DEFAULT_REFRESH_INTERVAL,
         compact: false,
         ...config.options
@@ -2534,9 +2654,6 @@ let LlmServerCard = class extends i$1 {
     this._expandedServices.set(serviceName, current === void 0 ? false : !current);
     this.requestUpdate();
   }
-  _isEntityUnavailable(entity) {
-    return !entity || entity.state === "unavailable" || entity.state === "unknown";
-  }
   _renderServices(services, options) {
     if (!services.length) {
       return b`
@@ -2604,7 +2721,7 @@ let LlmServerCard = class extends i$1 {
     const waiting = Number(attrs.waiting) || 0;
     const ttft = Number(attrs.ttft) || 0;
     const itl = Number(attrs.itl) || 0;
-    const tokens = Number(attrs.tokens) || 0;
+    const tps = Number(attrs.tps) || 0;
     const ttftPct = Math.min(100, ttft / 8e3 * 100);
     const ttftColor = getMetricColorClass(ttftPct);
     const itlPct = Math.min(100, itl / 300 * 100);
@@ -2628,12 +2745,12 @@ let LlmServerCard = class extends i$1 {
         </div>
       `);
     }
-    if (opts.show_tok_iter !== false) {
+    if (opts.show_tps !== false) {
       items.push(b`
         <div class="perf-info">
           <ha-icon icon="mdi:speedometer"></ha-icon>
-          <span class="perf-label">${this._messages.perf.tok_iter}</span>
-          <span class="perf-value">${tokens}</span>
+          <span class="perf-label">${this._messages.perf.tps}</span>
+          <span class="perf-value">${tps}</span>
         </div>
       `);
     }

@@ -116,7 +116,7 @@ export class LlmServerCard extends LitElement {
         show_waiting: true,
         show_ttft: true,
         show_itl: true,
-        show_tok_iter: true,
+        show_tps: true,
         refresh_interval: DEFAULT_REFRESH_INTERVAL,
         compact: false,
         ...config.options,
@@ -313,10 +313,6 @@ export class LlmServerCard extends LitElement {
     this.requestUpdate();
   }
 
-  private _isEntityUnavailable(entity?: HassEntity): boolean {
-    return !entity || entity.state === 'unavailable' || entity.state === 'unknown';
-  }
-
   private _renderServices(services: ServiceConfig[], options: DisplayOptions) {
     if (!services.length) {
       return html`
@@ -392,7 +388,7 @@ export class LlmServerCard extends LitElement {
     const waiting = Number(attrs.waiting) || 0;
     const ttft = Number(attrs.ttft) || 0;
     const itl = Number(attrs.itl) || 0;
-    const tokens = Number(attrs.tokens) || 0;
+    const tps = Number(attrs.tps) || 0;
 
     const ttftPct = Math.min(100, (ttft / 8000) * 100);
     const ttftColor = getMetricColorClass(ttftPct);
@@ -420,12 +416,12 @@ export class LlmServerCard extends LitElement {
         </div>
       `);
     }
-    if (opts.show_tok_iter !== false) {
+    if (opts.show_tps !== false) {
       items.push(html`
         <div class="perf-info">
           <ha-icon icon="mdi:speedometer"></ha-icon>
-          <span class="perf-label">${this._messages.perf.tok_iter}</span>
-          <span class="perf-value">${tokens}</span>
+          <span class="perf-label">${this._messages.perf.tps}</span>
+          <span class="perf-value">${tps}</span>
         </div>
       `);
     }

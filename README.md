@@ -2,7 +2,7 @@
 
 A custom Home Assistant Lovelace card for managing AI inference servers. Monitor status, GPU/RAM/temperature metrics, and control services directly from your dashboard.
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Screenshots
@@ -11,15 +11,14 @@ A custom Home Assistant Lovelace card for managing AI inference servers. Monitor
 
 ## Features
 
-- **Service Status** — Real-time status badges (running, stopped, starting, restarting, paused, unknown)
+- **Service Status** — Real-time status badges (running, stopped, starting, restarting, unknown)
 - **Optimistic UI** — Status updates instantly after action (start/stop/restart), reverts on error
 - **Toast Notifications** — Visual feedback on every action (success/error)
 - **Server Metrics** — Shared GPU/RAM/temperature bars for multi-model setups
-- **Per-Service Metrics** — GPU usage, VRAM, temperature, model info per service
-- **LLM Performance** — Running, waiting, TTFT, ITL (inter-token latency) and tokens/iter per service
+- **Per-Service Info** — Model and uptime displayed per service
+- **LLM Performance** — Running, waiting, TTFT, ITL (inter-token latency) and live generation rate (Gen tok/s) per service
 - **Expand/Collapse** — Collapsible per-service metrics with animated chevron (compact mode collapses by default)
 - **Last Updated** — Relative "last update" timestamp in the header
-- **Entity Warning** — Orange indicator when an entity is unavailable
 - **Host Custom Actions** — Add arbitrary buttons (with icons) that call any HA service, rendered at the server level
 - **Service Controls** — Start, stop, restart, logs with one click; buttons disabled during transitions
 - **Manual Refresh** — Force-refresh button to sync card with current HA state
@@ -74,16 +73,15 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
    - platform: command_line
      name: "LLM Metrics"
      command: "bash /config/scripts/llm_metrics.sh 10002 'your-model-name'"
-     json_attributes:
-       - status      # running / stopped / starting / restarting
-       - running
-       - waiting
-       - ttft
-       - itl
-       - tokens
-       - ctx
-       - model
-       - uptime
+      json_attributes:
+        - status      # running / stopped / starting / restarting
+        - running
+        - waiting
+        - ttft
+        - itl
+        - tps
+        - model
+        - uptime
      scan_interval: 15
      value_template: "{{ value_json.status }}"
    ```
@@ -94,7 +92,7 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
 - `DOCKER_CONTAINER` — optional container name for Docker health-based status
 - `MODEL_DIR` — optional model dir for PID file (default: `${MODEL}/`)
 
-**Output:** `{"status":"healthy","running":3,"waiting":0,"ttft":450,"itl":85,"tokens":256,"ctx":12000,"model":"Qwen3.6-27B","uptime":86400}`
+**Output:** `{"status":"healthy","running":3,"waiting":0,"ttft":450,"itl":85,"tps":42,"model":"Qwen3.6-27B","uptime":86400}`
 
 | Field | Description |
 |-------|-------------|
@@ -103,8 +101,7 @@ The `scripts/llm_metrics.sh` script provides a single JSON sensor for all infere
 | `waiting` | Queued requests |
 | `ttft` | Time to First Token (ms) |
 | `itl` | Inter-Token Latency (ms) |
-| `tokens` | Tokens per iteration |
-| `ctx` | Context length (derived) |
+| `tps` | Live generation rate in tok/s (0 when idle) |
 | `model` | Serving model (auto-detected from `/v1/models`) |
 | `uptime` | Process uptime (seconds) |
 
@@ -139,6 +136,7 @@ options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `server.name` | string | — | Server display name |
+| `server.ip` | string | — | Optional server IP shown in the card header |
 | `server.metrics` | object | — | Shared server-level metrics |
 | `server.metrics.gpu_entity` | string | — | GPU usage entity (%) |
 | `server.metrics.memory_entity` | string | — | RAM/VRAM usage entity (%) |
@@ -171,7 +169,7 @@ In the visual editor, use the "Host Custom Actions" section. The icon field auto
 | `services[].name` | string | — | Service display name (editable in visual editor) |
 | `services[].icon` | string | auto | MDI icon name |
 | `services[].color` | string | — | Custom service color (hex) |
-| `services[].metrics_entity` | string | — | HA entity for all metrics (JSON: status, model, uptime, running, waiting, ttft, itl, tokens, ctx) |
+| `services[].metrics_entity` | string | — | HA entity for all metrics (JSON: status, model, uptime, running, waiting, ttft, itl, tps) |
 | `services[].start_service` | string | — | HA service to start |
 | `services[].stop_service` | string | — | HA service to stop |
 | `services[].restart_service` | string | — | HA service to restart |
@@ -193,7 +191,7 @@ In the visual editor, use the "Host Custom Actions" section. The icon field auto
 | `options.show_waiting` | boolean | `true` | Show waiting queue |
 | `options.show_ttft` | boolean | `true` | Show TTFT |
 | `options.show_itl` | boolean | `true` | Show ITL |
-| `options.show_tok_iter` | boolean | `true` | Show tokens/iter |
+| `options.show_tps` | boolean | `true` | Show live generation rate (Gen tok/s) |
 | `options.refresh_interval` | number | `30` | Auto-refresh interval (seconds) |
 | `options.compact` | boolean | `false` | Compact display mode |
 
@@ -226,11 +224,21 @@ DGX Spark uses **Unified Memory Architecture (UMA)** where CPU and GPU share a 1
 
 Edit the card directly from the HA dashboard UI:
 
+- **Server** — Name, optional IP, shared metric entities
+- **Host Custom Actions** — Add/remove host-level action buttons (service field autocompletes `shell_command.*`, icon field autocompletes common MDI icons)
+- **Display Options** — Refresh interval
+- **Server Metrics / Service Display / Performance Metrics** — Show/hide toggles
 - **Basic tab** — Service name, icon, color
 - **Entities tab** — Metrics sensor picker
 - **Actions tab** — Start/stop/restart/logs service bindings
 
 ## Changelog
+
+### v1.2.1
+- `llm_metrics.sh`: removed unused `tokens` attribute, renamed `ctx` → `tps` (live generation tok/s) — the only rate the card displays (option `show_tok_iter` → `show_tps`)
+- Editor: icon autocomplete now works (missing MDI icon datalist added)
+- Build: output file name restored to `dist/llm-server-card.js`
+- Docs: README fixed (removed non-existent "Entity Warning" and per-service GPU/VRAM features, documented `server.ip`, corrected status list and `ctx` description)
 
 ### v1.2.0
 - Editor: service **name** now editable in visual editor (Basic tab)

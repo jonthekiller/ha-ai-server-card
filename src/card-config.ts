@@ -66,7 +66,7 @@ export interface DisplayOptions {
   show_waiting?: boolean;
   show_ttft?: boolean;
   show_itl?: boolean;
-  show_tok_iter?: boolean;
+  show_tps?: boolean;
   refresh_interval?: number;
   compact?: boolean;
 }

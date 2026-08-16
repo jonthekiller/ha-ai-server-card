@@ -2,7 +2,7 @@
  * Service status enum
  */
 export type ServiceStatus =
-  'running' | 'stopped' | 'restarting' | 'starting' | 'paused' | 'unknown';
+  'running' | 'stopped' | 'restarting' | 'starting' | 'unknown';
 
 /**
  * GPU metrics data
